@@ -1,0 +1,77 @@
+name: CI
+
+# 快速校验：编译能过 + 我们 fork 的补丁还在产物里。
+# （正式产物由 release.yml 触发，见那里）
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.1.1 --activate
+
+      - name: Install Dependencies
+        env:
+          SKIP_PREPARE: 1
+        run: pnpm install
+
+      # 源码级：合并上游时如果我们的补丁被静默丢掉，这几个锚点会先消失
+      - name: Guard - fork patches present in source
+        run: |
+          set -e
+          fail() { echo "::error::$1"; exit 1; }
+          grep -q "REPO_SLUG" src/shared/repo.ts || fail "src/shared/repo.ts 缺失"
+          grep -q "extra-config.yaml" src/main/config/extraConfig.ts || fail "extraConfig.ts 缺失"
+          grep -q "applyExtraConfig" src/main/core/factory.ts || fail "factory.ts 未调用 applyExtraConfig"
+          grep -q "openExtraConfig" src/main/utils/ipc.ts || fail "openExtraConfig IPC 未注册"
+          grep -q "libasound2t64 | libasound2" electron-builder.yml || fail "deb 依赖修正被回退了"
+          grep -q "extra-config" README.md || fail "README fork 说明缺失"
+          echo "✅ 源码锚点齐全"
+
+      - name: Build
+        run: pnpm exec electron-vite build
+
+      # 构建期常量如果漏了 define，标识符会原样进 bundle，运行时直接 ReferenceError
+      - name: Guard - no unreplaced build defines
+        run: |
+          set -e
+          if grep -rn "__SPARKLE_[A-Z_]*__" out/ ; then
+            echo "::error::产物里还有没被替换的编译期常量，运行时必然 ReferenceError"
+            exit 1
+          fi
+          echo "✅ 没有残留的编译期常量"
+
+      # 产物级：合并上游后即使源码锚点在，也可能因为打包配置变了而丢失功能
+      - name: Guard - fork features present in bundle
+        run: |
+          set -e
+          MAIN=out/main/index.js
+          fail() { echo "::error::$1"; exit 1; }
+          grep -q "extra-config.yaml" "$MAIN" || fail "主进程产物里没有 extra-config.yaml"
+          grep -q "UshioA/sparkle-x365" "$MAIN" || fail "更新源没有指向本 fork"
+          ! grep -q "xishang0128/sparkle/releases" "$MAIN" || fail "主进程里仍有上游 release 地址"
+          grep -rq "附加配置" out/renderer/assets/ || fail "渲染层缺少「附加配置」卡片"
+          echo "✅ fork 功能都打进产物了"

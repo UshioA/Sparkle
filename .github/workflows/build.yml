@@ -31,46 +31,18 @@ jobs:
           - os: windows-latest
             arch: x64
             format: nsis
-          - os: windows-latest
-            arch: arm64
-            format: 7z
-          - os: windows-latest
-            arch: arm64
-            format: nsis
 
           - os: ubuntu-latest
             arch: x64
             format: deb
           - os: ubuntu-latest
             arch: x64
-            format: rpm
-          - os: ubuntu-latest
-            arch: x64
-            format: pacman
-          - os: ubuntu-latest
-            arch: arm64
-            format: deb
-          - os: ubuntu-latest
-            arch: arm64
-            format: rpm
-          - os: ubuntu-latest
-            arch: arm64
-            format: pacman
-          - os: ubuntu-latest
-            arch: loong64
-            format: deb
-          - os: ubuntu-latest
-            arch: loong64
-            format: rpm
-          - os: ubuntu-latest
-            arch: loong64
-            format: pacman
+            format: tar.gz
 
           - os: macos-latest
             arch: x64
           - os: macos-latest
             arch: arm64
-
     name: Build ${{ matrix.os }}-${{ matrix.arch }}${{ matrix.format && '-' || '' }}${{ matrix.format || '' }}
 
     steps:
@@ -198,6 +170,29 @@ jobs:
           else
             pnpm build:mac --${{ matrix.arch }}
           fi
+
+      # 应用内更新是按固定文件名找资产的（见 autoUpdater 的 fileMap），
+      # 所以这里把命名钉死，改了 artifactName 必须同步改那边。
+      - name: Verify Artifact Names
+        shell: bash
+        run: |
+          set -e
+          ls -1 dist/
+          case "${{ matrix.os }}-${{ matrix.format }}" in
+            windows-latest-nsis)   pat="sparkle-windows-*-setup.exe" ;;
+            windows-latest-7z)     pat="sparkle-windows-*-portable.7z" ;;
+            ubuntu-latest-deb)     pat="sparkle-linux-*-amd64.deb" ;;
+            ubuntu-latest-tar.gz)  pat="sparkle-linux-*-x64.tar.gz" ;;
+            macos-latest-)         pat="sparkle-macos-*-x64.pkg"; [ "${{ matrix.arch }}" = "arm64" ] && pat="sparkle-macos-*-arm64.pkg" ;;
+            *) echo "::error::未知的矩阵组合"; exit 1 ;;
+          esac
+          # shellcheck disable=SC2086
+          matched=$(ls -1 dist/ | grep -E "^${pat//\*/.*}$" || true)
+          if [ -z "$matched" ]; then
+            echo "::error::没找到符合 $pat 的产物（应用内更新会因此失效）"
+            exit 1
+          fi
+          echo "✅ 产物命名符合预期: $matched"
 
       - name: Add Portable Flag
         if: matrix.os == 'windows-latest' && matrix.format == '7z'
