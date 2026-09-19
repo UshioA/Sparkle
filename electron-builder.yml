@@ -63,7 +63,7 @@ linux:
     - deb
     - rpm
     - pacman
-  maintainer: xishang0128 <xishang02@gmail.com>
+  maintainer: UshioA <79308995+UshioA@users.noreply.github.com>
   category: Utility
   artifactName: ${name}-linux-${version}-${arch}.${ext}
 deb:
@@ -71,7 +71,7 @@ deb:
     - --before-install=build/linux/preinst
   afterInstall: 'build/linux/postinst'
   depends:
-    - libasound2
+    - libasound2t64 | libasound2
     - libgtk-3-0
     - libnotify4
     - libnss3
