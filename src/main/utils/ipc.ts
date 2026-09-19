@@ -75,6 +75,7 @@ import {
   deleteElevateTask,
   getFilePath,
   openFile,
+  openExtraConfig,
   openUWPTool,
   readImageFileDataURL,
   readTextFile,
@@ -387,6 +388,7 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('closeFloatingWindow', () => ipcErrorWrapper(closeFloatingWindow)())
   ipcMain.handle('showContextMenu', () => ipcErrorWrapper(showContextMenu)())
   ipcMain.handle('openFile', (_e, type, id, ext) => openFile(type, id, ext))
+  ipcMain.handle('openExtraConfig', () => ipcErrorWrapper(openExtraConfig)())
   ipcMain.handle('openDevTools', () => {
     mainWindow?.webContents.openDevTools()
   })

@@ -1,3 +1,18 @@
+# Sparkle (x365 fork)
+
+> **这是 [xishang0128/sparkle](https://github.com/xishang0128/sparkle) 的私有 fork（UshioA）。**
+> 上游的下载链接、更新检查和发布包都**不适用于本仓**，请只使用本仓 Releases 里的产物。
+>
+> 相对上游的改动：
+> - **更新源改指向本仓**：应用内检查更新只会拉本仓的 Release，绝不会把用户带到上游包；
+> - **`附加配置`**：`<数据目录>/extra-config.yaml` 的内容会合并进运行时配置（供第三方内核使用），
+>   支持 `target-core` / `requires-version` 两个门控；
+> - 修正 Linux 打包依赖 `libasound2t64 | libasound2`（Ubuntu 24.04 的 t64 改名）。
+>
+> 协议实现不在本仓：本仓内置的是**官方 mihomo 内核**，第三方内核请自行以「系统内核」方式接入。
+
+---
+
 # Sparkle
 
 <h3 align="center">Another <a href="https://github.com/MetaCubeX/mihomo">Mihomo</a> GUI</h3>
