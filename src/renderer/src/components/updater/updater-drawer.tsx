@@ -1,4 +1,5 @@
 import { Button, Drawer, Label, Link, ProgressBar } from '@heroui-v3/react'
+import { REPO_URL } from '../../../../shared/repo'
 import ReactMarkdown from 'react-markdown'
 import React, { useEffect, useRef, useState } from 'react'
 import { downloadAndInstallUpdate } from '@renderer/utils/ipc'
@@ -82,7 +83,7 @@ const UpdaterDrawer: React.FC<Props> = (props) => {
 
   const isDownloading = updateStatus?.downloading || downloading
   const releaseTag = tag ?? (version.includes('-rolling-') ? 'rolling' : version)
-  const releaseUrl = `https://github.com/xishang0128/sparkle/releases/tag/${releaseTag}`
+  const releaseUrl = `${REPO_URL}/releases/tag/${releaseTag}`
   const releaseLink = !isDownloading && (
     <Link
       className={

@@ -1,4 +1,5 @@
 import { app, Menu, shell, dialog } from 'electron'
+import { REPO_URL } from '../../shared/repo'
 import { mainWindow } from '..'
 import { getAppConfig } from '../config'
 import { quitWithoutCore } from '../core/manager'
@@ -171,13 +172,13 @@ export async function createApplicationMenu(): Promise<void> {
         {
           label: '了解更多',
           click: () => {
-            shell.openExternal('https://github.com/xishang0128/sparkle')
+            shell.openExternal(REPO_URL)
           }
         },
         {
           label: '报告问题',
           click: () => {
-            shell.openExternal('https://github.com/xishang0128/sparkle/issues')
+            shell.openExternal(`${REPO_URL}/issues`)
           }
         },
         { type: 'separator' },

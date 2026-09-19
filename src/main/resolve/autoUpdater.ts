@@ -22,9 +22,11 @@ import { systemCoreOnlyBuild } from '../../shared/build-flags'
 
 let downloadCancelToken: CancelTokenSource | null = null
 const WINDOWS_INSTALLER_MIN_TEMP_SPACE_BYTES = 1024 * 1024 * 1024
+import { REPO_SLUG } from '../../shared/repo'
+
 const UPDATE_MANIFEST_URLS: Record<AppUpdateChannel, string> = {
-  stable: 'https://github.com/xishang0128/sparkle/releases/latest/download/latest.yml',
-  rolling: 'https://github.com/xishang0128/sparkle/releases/download/rolling/latest.yml'
+  stable: `https://github.com/${REPO_SLUG}/releases/latest/download/latest.yml`,
+  rolling: `https://github.com/${REPO_SLUG}/releases/download/rolling/latest.yml`
 }
 
 function getGitHubAuthHeaders(token?: string): Record<string, string> {
@@ -52,20 +54,28 @@ export async function checkUpdate(): Promise<AppVersion | undefined> {
   const { 'mixed-port': mixedPort = 7890 } = await getControledMihomoConfig()
   const { updateChannel = 'stable', githubToken } = await getAppConfig()
   const url = UPDATE_MANIFEST_URLS[updateChannel]
-  const res = await axios.get(url, {
-    headers: {
-      'Content-Type': 'application/octet-stream',
-      ...getGitHubAuthHeaders(githubToken)
-    },
-    ...(mixedPort != 0 && {
-      proxy: {
-        protocol: 'http',
-        host: '127.0.0.1',
-        port: mixedPort
-      }
-    }),
-    responseType: 'text'
-  })
+  let res
+  try {
+    res = await axios.get(url, {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        ...getGitHubAuthHeaders(githubToken)
+      },
+      ...(mixedPort != 0 && {
+        proxy: {
+          protocol: 'http',
+          host: '127.0.0.1',
+          port: mixedPort
+        }
+      }),
+      responseType: 'text'
+    })
+  } catch (error) {
+    // this fork has not published a release yet, or the release is gone
+    const status = (error as { response?: { status?: number } })?.response?.status
+    if (status === 404 || status === 403) return undefined
+    throw error
+  }
   const latest = parseYaml<AppVersion>(res.data)
   const currentVersion = app.getVersion()
   if (latest.version !== currentVersion) {
@@ -118,7 +128,7 @@ export async function downloadAndInstallUpdate(version: string, tag?: string): P
   const { 'mixed-port': mixedPort = 7890 } = await getControledMihomoConfig()
   const { githubToken } = await getAppConfig()
   const releaseTag = resolveReleaseTag(version, tag)
-  const baseUrl = `https://github.com/xishang0128/sparkle/releases/download/${releaseTag}/`
+  const baseUrl = `https://github.com/${REPO_SLUG}/releases/download/${releaseTag}/`
   const fileMap: Record<string, string> = {
     'win32-x64': `sparkle-windows-${version}-x64-setup.exe`,
     'win32-arm64': `sparkle-windows-${version}-arm64-setup.exe`,
@@ -134,7 +144,7 @@ export async function downloadAndInstallUpdate(version: string, tag?: string): P
   }
   downloadCancelToken = axios.CancelToken.source()
 
-  const apiUrl = `https://api.github.com/repos/xishang0128/sparkle/releases/tags/${releaseTag}`
+  const apiUrl = `https://api.github.com/repos/${REPO_SLUG}/releases/tags/${releaseTag}`
   const apiRequestConfig: AxiosRequestConfig = {
     headers: {
       Accept: 'application/vnd.github.v3+json',
