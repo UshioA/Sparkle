@@ -258,3 +258,7 @@ node --version
    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=xishang0128/sparkle&type=date&legend=top-left&sealed_token=8SxlRPbsElPsEs9Q_QZ1jaPSZ9Q5E8UAgzHopZ03eHbfFl-j7100-bjDDbbBm8YN5oxxkqEZ_9Mhx7Xc1wnzSyI9pduKkTQReWJaOyZnN3Q38CBRuQlYnDo4kkx7ExoYdyzZgiZo9_IAMeuRLxPozFwu-clyQSZ9oSxBvD8Ldxe8TzMJeY7x-onoQY7Y" />
  </picture>
 </a>
+
+---
+
+基于 [xishang0128/sparkle](https://github.com/xishang0128/sparkle)（GPL-3.0）修改而来。

@@ -1,4 +1,5 @@
 import { Button } from '@heroui/react'
+import { REPO_URL } from '../../../shared/repo'
 import BasePage from '@renderer/components/base/base-page'
 // import { CgWebsite } from 'react-icons/cg'
 import { IoLogoGithub } from 'react-icons/io5'
@@ -36,7 +37,7 @@ const Settings: React.FC = () => {
             variant="light"
             className="app-nodrag"
             onPress={() => {
-              window.open('https://github.com/xishang0128/sparkle')
+              window.open(REPO_URL)
             }}
           >
             <IoLogoGithub className="text-lg" />

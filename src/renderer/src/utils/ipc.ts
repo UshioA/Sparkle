@@ -540,6 +540,10 @@ export async function openFile(
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('openFile', type, id, ext))
 }
 
+export async function openExtraConfig(): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('openExtraConfig'))
+}
+
 export async function openDevTools(): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('openDevTools'))
 }

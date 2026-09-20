@@ -14,6 +14,7 @@ import {
   resourcesFilesDir,
   taskDir
 } from '../utils/dirs'
+import { ensureExtraConfigFile } from '../config/extraConfig'
 import { copyFileSync, writeFileSync } from 'fs'
 import { execWithElevation } from '../utils/elevation'
 
@@ -45,6 +46,12 @@ export async function readImageFileDataURL(filePath: string): Promise<string> {
   const data = await readFile(filePath)
 
   return `data:${mimeType};base64,${data.toString('base64')}`
+}
+
+export async function openExtraConfig(): Promise<void> {
+  const file = ensureExtraConfigFile()
+  const message = await shell.openPath(file)
+  if (message) throw new Error(message)
 }
 
 export function openFile(type: 'profile' | 'override', id: string, ext?: 'yaml' | 'js'): void {

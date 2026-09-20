@@ -1,0 +1,80 @@
+name: CI
+
+# 快速校验：编译能过 + 关键功能还在产物里。
+# （正式产物由 release.yml 触发，见那里）
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.1.1 --activate
+
+      - name: Install Dependencies
+        env:
+          SKIP_PREPARE: 1
+        run: pnpm install
+
+      # 源码级：合并上游时如果这些改动被静默丢掉，锚点会先报错
+      - name: Guard - required sources present
+        run: |
+          set -e
+          fail() { echo "::error::$1"; exit 1; }
+          grep -q "REPO_SLUG" src/shared/repo.ts || fail "src/shared/repo.ts 缺失"
+          grep -q "extra-config.yaml" src/main/config/extraConfig.ts || fail "extraConfig.ts 缺失"
+          grep -q "applyExtraConfig" src/main/core/factory.ts || fail "factory.ts 未调用 applyExtraConfig"
+          grep -q "openExtraConfig" src/main/utils/ipc.ts || fail "openExtraConfig IPC 未注册"
+          grep -q "libasound2t64 | libasound2" electron-builder.yml || fail "deb 依赖修正被回退了"
+          grep -q "verify:sidecar" package.json || fail "内置内核校验脚本被删了"
+          grep -qE "verify[-:]sidecar" .github/workflows/build.yml || fail "build.yml 没有跑内置内核校验"
+          grep -q "setPath('userData'" src/main/index.ts || fail "便携版 userData/单实例锁修复被回退了（会被已安装的旧版抢锁）"
+          grep -q "applyGroupInject" src/main/config/extraConfig.ts || fail "群组注入（group-inject）实现被回退了"
+          echo "✅ 源码锚点齐全"
+
+      - name: Build
+        run: pnpm exec electron-vite build
+
+      # 构建期常量如果漏了 define，标识符会原样进 bundle，运行时直接 ReferenceError
+      - name: Guard - no unreplaced build defines
+        run: |
+          set -e
+          if grep -rn "__SPARKLE_[A-Z_]*__" out/ ; then
+            echo "::error::产物里还有没被替换的编译期常量，运行时必然 ReferenceError"
+            exit 1
+          fi
+          echo "✅ 没有残留的编译期常量"
+
+      # 产物级：合并上游后即使源码锚点在，也可能因为打包配置变了而丢失功能
+      - name: Guard - features present in bundle
+        run: |
+          set -e
+          MAIN=out/main/index.js
+          fail() { echo "::error::$1"; exit 1; }
+          grep -q "extra-config.yaml" "$MAIN" || fail "主进程产物里没有 extra-config.yaml"
+          grep -q "UshioA/Sparkle" "$MAIN" || fail "更新源没有指向本仓"
+          ! grep -q "xishang0128/sparkle/releases" "$MAIN" || fail "主进程里仍有上游 release 地址"
+          grep -rq "附加配置" out/renderer/assets/ || fail "渲染层缺少「附加配置」卡片"
+          echo "✅ 功能都打进产物了"

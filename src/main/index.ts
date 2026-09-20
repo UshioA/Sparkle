@@ -10,6 +10,8 @@ import { createTray } from './resolve/tray'
 import { createApplicationMenu } from './resolve/menu'
 import { init } from './utils/init'
 import { join } from 'path'
+import { mkdirSync } from 'fs'
+import { dataDir, isPortable } from './utils/dirs'
 import { initShortcut } from './resolve/shortcut'
 import { initProfileUpdater } from './core/profileUpdater'
 import { startMonitor } from './resolve/trafficMonitor'
@@ -88,6 +90,23 @@ async function scheduleLightweightMode(): Promise<void> {
   }
 
   quitTimeout = setTimeout(enterLightweightMode, autoLightweightDelay * 1000)
+}
+
+// 便携版（解压目录里有 PORTABLE 标记）必须把 Electron 的 userData 也指到解压目录：
+// 单实例锁就落在 userData 里，而便携版默认和安装版共用 %APPDATA%\sparkle —— 本机只要
+// 还装着/开着旧版 Sparkle，双击新解压的便携版时 requestSingleInstanceLock() 会失败、
+// 进程直接退出，旧实例的 second-instance 只会把旧窗口叫到最前面：用户看到的是旧版本的
+// UI 和旧内核，会误以为新包被污染了。顺带让缓存 / 窗口状态 / tasks 真正落在解压目录，
+// 和 dataDir() 的定义保持一致。
+if (isPortable()) {
+  const portableDataDir = dataDir()
+  try {
+    mkdirSync(portableDataDir, { recursive: true })
+    app.setPath('userData', portableDataDir)
+  } catch (error) {
+    // 解压目录不可写（例如被放到 Program Files）：退回默认 userData，别让应用起不来
+    console.error('[App]: 便携版 userData 设置失败，回退默认路径', error)
+  }
 }
 
 const syncConfig = getAppConfigSync()

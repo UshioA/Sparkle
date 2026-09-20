@@ -1,13 +1,13 @@
 {
   "name": "sparkle",
-  "version": "1.26.8",
+  "version": "1.26.10",
   "description": "Sparkle",
   "main": "./out/main/index.js",
   "author": {
     "name": "xishang0128",
     "email": "xishang02@gmail.com"
   },
-  "homepage": "https://github.com/xishang0128/sparkle",
+  "homepage": "https://github.com/UshioA/Sparkle",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
@@ -16,14 +16,15 @@
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
     "ensure:electron": "node scripts/install-electron.ts",
     "prepare": "node scripts/prepare.ts",
+    "verify:sidecar": "node scripts/verify-sidecar.ts",
     "updater": "node scripts/updater.ts",
     "checksum": "node scripts/checksum.ts",
     "telegram": "node scripts/telegram.ts",
     "dev": "pnpm run ensure:electron && electron-vite dev",
     "postinstall": "pnpm run ensure:electron && electron-builder install-app-deps",
-    "build:win": "electron-vite build && electron-builder --publish never --win",
-    "build:mac": "electron-vite build && electron-builder --publish never --mac",
-    "build:linux": "electron-vite build && node scripts/package-linux.ts"
+    "build:win": "node scripts/verify-sidecar.ts && electron-vite build && electron-builder --publish never --win",
+    "build:mac": "node scripts/verify-sidecar.ts && electron-vite build && electron-builder --publish never --mac",
+    "build:linux": "node scripts/verify-sidecar.ts && electron-vite build && node scripts/package-linux.ts"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
@@ -98,5 +99,9 @@
     "typescript": "^6.0.3",
     "vite": "^8.2.2"
   },
-  "packageManager": "pnpm@11.1.1"
+  "packageManager": "pnpm@11.1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/UshioA/Sparkle.git"
+  }
 }
