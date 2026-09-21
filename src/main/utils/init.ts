@@ -3,6 +3,7 @@ import {
   controledMihomoConfigPath,
   dataDir,
   logDir,
+  mihomoCorePath,
   mihomoTestDir,
   mihomoWorkDir,
   overrideConfigPath,
@@ -44,6 +45,7 @@ import { startSSIDCheck } from '../sys/ssid'
 import { startNetworkDetection } from '../core/manager'
 import { initKeyManager } from '../service/manager'
 import { appendAppLog } from './log'
+import { primeUserCoreCache } from '../core/coreCache'
 
 async function initDirs(): Promise<void> {
   if (!existsSync(dataDir())) {
@@ -215,12 +217,27 @@ function runBackgroundInitTask(name: string, task: Promise<void>): void {
   })
 }
 
+function primeConfiguredCoreCache(appConfig: AppConfig): Promise<void> {
+  const { core = 'mihomo' } = appConfig
+  let corePath: string
+  try {
+    corePath = mihomoCorePath(core)
+  } catch {
+    return Promise.resolve()
+  }
+  if (!existsSync(corePath)) return Promise.resolve()
+  return primeUserCoreCache(corePath, {
+    log: (message) => appendAppLog(message)
+  })
+}
+
 function startBackgroundInit(appConfig: AppConfig): void {
   const { sysProxy, onlyActiveDevice = false, networkDetection = false } = appConfig
 
   runBackgroundInitTask('substore frontend', startSubStoreFrontendServer())
   runBackgroundInitTask('substore backend', startSubStoreBackendServer())
   runBackgroundInitTask('ssid check', startSSIDCheck())
+  runBackgroundInitTask('core cache', primeConfiguredCoreCache(appConfig))
 
   if (networkDetection) {
     runBackgroundInitTask('network detection', startNetworkDetection())

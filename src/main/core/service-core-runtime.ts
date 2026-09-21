@@ -27,6 +27,9 @@ import {
 import { shouldSkipServiceUnavailableFallback } from '../service/fallback'
 import { appendAppLog, setMihomoLogSource } from '../utils/log'
 import { showNotification } from '../utils/notification'
+import { dataDir } from '../utils/dirs'
+import { ensureCoreReadable, isCoreReadable } from './coreAccess'
+import { coreFileParts, ensureUserCoreCache } from './coreCache'
 
 interface ServiceCoreRuntimeOptions {
   notifyCoreLog: (source: ServiceCoreEvent) => void
@@ -128,9 +131,29 @@ export function createServiceCoreRuntime(options: ServiceCoreRuntimeOptions) {
 
   async function fallbackToElevatedCore(
     detached: boolean,
-    reason: unknown
+    reason: unknown,
+    corePath: string
   ): Promise<Promise<void>[]> {
     await appendAppLog(`[Manager]: Service unavailable, fallback to elevated core, ${reason}\n`)
+
+    // 服务模式会把内核目录 ACL 收紧；切到普通权限直启前，先确认内核真的能读。
+    await ensureCoreReadable(corePath, (message) => appendAppLog(message))
+    const { name, ext } = coreFileParts(corePath)
+    const fallbackCorePath = await ensureUserCoreCache(corePath, name, ext, {
+      baseDir: dataDir(),
+      log: (message) => appendAppLog(message)
+    })
+    if (!isCoreReadable(fallbackCorePath)) {
+      await appendAppLog(
+        `[Manager]: Core is not readable, skip fallback to elevated core, ${corePath}\n`
+      )
+      void showNotification({
+        title: '内核无法启动',
+        body: '无法读取内核文件，请检查内核路径或重新选择内核。',
+        variant: 'danger'
+      })
+      return []
+    }
     stopEventHandlers()
     await patchAppConfig({ corePermissionMode: 'elevated' })
     mainWindow?.webContents.send('appConfigUpdated')

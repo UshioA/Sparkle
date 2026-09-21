@@ -46,6 +46,8 @@ import {
 } from '../utils/notification'
 import { createCoreHookWaiter, createCoreStartupHook } from './startupHook'
 import { stopChildProcess } from './process-control'
+import { ensureCoreReadable, isCoreReadable } from './coreAccess'
+import { coreFileParts, ensureServiceCoreCopy, ensureUserCoreCache } from './coreCache'
 import { recoverDNS, setPublicDNS, startNetworkDetectionController } from './network'
 import { checkProfile } from './profile-check'
 import {
@@ -191,6 +193,11 @@ function findTailscaleAuthUrlEnd(url: string): number {
   }
 
   return -1
+}
+
+function isFatalSpawnError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code
+  return code === 'ENOENT' || code === 'EACCES' || code === 'EPERM'
 }
 
 function delay(ms: number): Promise<void> {
@@ -357,6 +364,7 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
     }
     throw error
   }
+  const { name: coreName, ext: coreExt } = coreFileParts(corePath)
 
   await generateProfile()
   if (useServiceCore || detached) {
@@ -371,7 +379,7 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
       if (isServiceUnavailableError(error)) {
         const probe = await waitForServiceCoreConnection(error)
         if (!probe.reachable) {
-          return serviceCoreRuntime.fallbackToElevatedCore(detached, probe.error)
+          return serviceCoreRuntime.fallbackToElevatedCore(detached, probe.error, corePath)
         }
         serviceCoreRunning = probe.running
       }
@@ -418,8 +426,12 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
   })
 
   if (useServiceCore) {
+    const serviceCorePath = await ensureServiceCoreCopy(corePath, coreName, coreExt, {
+      baseDir: dataDir(),
+      log: (message) => appendAppLog(message)
+    })
     const serviceProfile: ServiceCoreLaunchProfile = {
-      core_path: corePath,
+      core_path: serviceCorePath,
       args: spawnArgs,
       mode: serviceRunMode,
       safe_paths: safePaths,
@@ -444,7 +456,7 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
       if (isServiceUnavailableError(error)) {
         const probe = await waitForServiceCoreConnection(error)
         if (!probe.reachable) {
-          return serviceCoreRuntime.fallbackToElevatedCore(detached, probe.error)
+          return serviceCoreRuntime.fallbackToElevatedCore(detached, probe.error, corePath)
         }
         await serviceCoreRuntime.startEventStream()
         if (!probe.running) {
@@ -467,11 +479,31 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
   const stderr = createLogWritable('core', 'error')
   directCoreState.logLineBuffer = ''
 
-  const child = spawn(corePath, spawnArgs, {
-    detached: detached,
-    stdio: detached ? 'ignore' : undefined,
-    env: env
+  // 自愈：服务模式可能把内核目录/文件的 ACL 收紧过，普通权限 spawn 前先修回读+执行权限。
+  await ensureCoreReadable(corePath, (message) => appendAppLog(message))
+  // 兜底：源不可读时改用 <dataDir>/core-cache 里用户可读的副本。
+  const directCorePath = await ensureUserCoreCache(corePath, coreName, coreExt, {
+    baseDir: dataDir(),
+    log: (message) => appendAppLog(message)
   })
+  if (!isCoreReadable(directCorePath)) {
+    throw new Error(`内核文件不可读：${directCorePath}`)
+  }
+
+  let child: ChildProcess
+  try {
+    child = spawn(directCorePath, spawnArgs, {
+      detached: detached,
+      stdio: detached ? 'ignore' : undefined,
+      env: env
+    })
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    await appendAppLog(
+      `[Manager]: Core spawn failed${code ? ` (${code})` : ''}: ${(error as Error).message}\n`
+    )
+    throw new Error(`内核启动失败：${(error as Error).message}`)
+  }
   directCoreState.child = child
   let startupOutput = ''
   let configurationRejected = false
@@ -486,6 +518,8 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
   child.stderr?.on('data', captureStartupOutput)
   child.once('error', (error) => {
     spawnError = error
+    const code = (error as NodeJS.ErrnoException).code
+    void appendAppLog(`[Manager]: Core spawn error${code ? ` (${code})` : ''}: ${error.message}\n`)
   })
   const startupFailure = (reason: unknown): Error => {
     const details = startupOutput.trim()
@@ -511,7 +545,21 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
   }
   child.on('close', async (code, signal) => {
     flushDirectCoreLogNotifications()
-    await appendAppLog(`[Manager]: Core closed, code: ${code}, signal: ${signal}\n`)
+    const spawnErrorCode = (spawnError as NodeJS.ErrnoException | undefined)?.code
+    await appendAppLog(
+      `[Manager]: Core closed, code: ${code}, signal: ${signal}${spawnErrorCode ? `, spawn error: ${spawnErrorCode}` : ''}\n`
+    )
+    const fatalSpawnFailure = isFatalSpawnError(spawnError) || code === -4058
+    if (fatalSpawnFailure) {
+      // ENOENT/EACCES 之类的错误重试多少次都一样，直接给出可操作提示。
+      void showNotification({
+        title: '内核启动失败',
+        body: `无法访问内核文件（${spawnErrorCode ?? code}）：${directCorePath}`,
+        variant: 'danger'
+      })
+      await stopCore()
+      return
+    }
     if (!configurationRejected && directCoreState.retry) {
       await appendAppLog(`[Manager]: Try Restart Core\n`)
       directCoreState.retry--
