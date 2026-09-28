@@ -390,5 +390,19 @@ export function findSystemMihomo(): string[] {
     }
   }
 
+  try {
+    const coresDir = path.join(dataDir(), 'cores')
+    if (existsSync(coresDir)) {
+      for (const file of readdirSync(coresDir)) {
+        const full = path.join(coresDir, file)
+        if (!foundPaths.includes(full)) {
+          foundPaths.push(full)
+        }
+      }
+    }
+  } catch {
+    // ignore
+  }
+
   return Array.from(new Set(foundPaths)).sort()
 }

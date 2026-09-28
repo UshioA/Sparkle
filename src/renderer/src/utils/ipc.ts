@@ -337,6 +337,10 @@ export async function findSystemMihomo(): Promise<string[]> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('findSystemMihomo'))
 }
 
+export async function pickSystemCore(): Promise<string | undefined> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('pickSystemCore'))
+}
+
 export async function getFilePath(
   ext: string[],
   title?: string,

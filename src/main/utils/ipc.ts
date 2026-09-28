@@ -63,6 +63,7 @@ import {
 } from '../resolve/server'
 import { quitWithoutCore, restartCore, startNetworkDetection, stopCore } from '../core/manager'
 import { clearAccountProviderCache } from '../core/accountCache'
+import { pickSystemCore } from '../core/systemCore'
 import { stopNetworkDetection } from '../core/network'
 import {
   checkCorePermission,
@@ -323,6 +324,7 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('restartService', () => ipcErrorWrapper(restartService)())
   ipcMain.handle('stopService', () => ipcErrorWrapper(stopService)())
   ipcMain.handle('findSystemMihomo', () => findSystemMihomo())
+  ipcMain.handle('pickSystemCore', () => ipcErrorWrapper(pickSystemCore)())
   ipcMain.handle('getFilePath', (_e, ext, title, filterName) => getFilePath(ext, title, filterName))
   ipcMain.handle('readTextFile', (_e, filePath) => ipcErrorWrapper(readTextFile)(filePath))
   ipcMain.handle('readImageFileDataURL', (_e, filePath) =>

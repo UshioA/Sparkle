@@ -16,6 +16,7 @@ import {
   restartCore,
   revokeCorePermission,
   findSystemMihomo,
+  pickSystemCore,
   deleteElevateTask,
   installService,
   uninstallService,
@@ -118,18 +119,32 @@ const Mihomo: React.FC = () => {
     if (newCore === 'system') {
       const paths = await getSystemCorePaths()
 
-      if (paths.length === 0) {
-        notify('未找到系统内核', {
-          body: '系统中未找到可用的 mihomo 或 clash 内核，已自动切换回内置内核'
-        })
-        return
-      }
-
-      if (!appConfig?.systemCorePath || !paths.includes(appConfig.systemCorePath)) {
+      // 扫不到内核时也允许切到「系统内核」，用户可以点「选择文件」手动指定；
+      // 扫到了才自动补一个默认路径。
+      if (
+        paths.length > 0 &&
+        (!appConfig?.systemCorePath || !paths.includes(appConfig.systemCorePath))
+      ) {
         await patchAppConfig({ systemCorePath: paths[0] })
       }
     }
     handleConfigChangeWithRestart('core', newCore)
+  }
+
+  const handlePickSystemCore = async (): Promise<void> => {
+    try {
+      const picked = await pickSystemCore()
+      if (!picked) return
+      systemCorePathsCache = [picked]
+      cachePromise = null
+      setSystemCorePaths([picked])
+      setLoadingPaths(false)
+      await restartCore()
+      PubSub.publish('mihomo-core-changed')
+      notify(`已设置系统内核：${picked}`, { variant: 'success' })
+    } catch (e) {
+      notify(e, { variant: 'danger' })
+    }
   }
 
   const handlePermissionModeChange = async (key: string): Promise<void> => {
@@ -191,66 +206,73 @@ const Mihomo: React.FC = () => {
         />
       )}
       <SettingCard>
-        {systemCoreOnlyBuild ? null : (<SettingItem
-          compatKey="legacy"
-          title="内核版本"
-          actions={
-            core === 'mihomo' || core === 'mihomo-alpha' ? (
-              <Button
-                size="sm"
-                isIconOnly
-                variant="light"
-                isLoading={upgrading}
-                onPress={handleCoreUpgrade}
-              >
-                <IoMdCloudDownload className="text-lg" />
-              </Button>
-            ) : null
-          }
-          divider
-        >
-          <Select
-            aria-label="内核版本"
-            classNames={{ trigger: 'data-[hover=true]:bg-default-200' }}
-            className="w-37.5"
-            size="sm"
-            selectedKeys={new Set([core])}
-            disallowEmptySelection={true}
-            onSelectionChange={(v) =>
-              handleCoreChange(v.currentKey as 'mihomo' | 'mihomo-alpha' | 'system')
+        {systemCoreOnlyBuild ? null : (
+          <SettingItem
+            compatKey="legacy"
+            title="内核版本"
+            actions={
+              core === 'mihomo' || core === 'mihomo-alpha' ? (
+                <Button
+                  size="sm"
+                  isIconOnly
+                  variant="light"
+                  isLoading={upgrading}
+                  onPress={handleCoreUpgrade}
+                >
+                  <IoMdCloudDownload className="text-lg" />
+                </Button>
+              ) : null
             }
+            divider
           >
-            <SelectItem key="mihomo">内置稳定版</SelectItem>
-            <SelectItem key="mihomo-alpha">内置预览版</SelectItem>
-            <SelectItem key="system">使用系统内核</SelectItem>
-          </Select>
-        </SettingItem>)}
+            <Select
+              aria-label="内核版本"
+              classNames={{ trigger: 'data-[hover=true]:bg-default-200' }}
+              className="w-37.5"
+              size="sm"
+              selectedKeys={new Set([core])}
+              disallowEmptySelection={true}
+              onSelectionChange={(v) =>
+                handleCoreChange(v.currentKey as 'mihomo' | 'mihomo-alpha' | 'system')
+              }
+            >
+              <SelectItem key="mihomo">内置稳定版</SelectItem>
+              <SelectItem key="mihomo-alpha">内置预览版</SelectItem>
+              <SelectItem key="system">使用系统内核</SelectItem>
+            </Select>
+          </SettingItem>
+        )}
         {core === 'system' && (
           <SettingItem compatKey="legacy" title="系统内核路径选择" divider>
-            <Select
-              aria-label="系统内核路径"
-              classNames={{ trigger: 'data-[hover=true]:bg-default-200' }}
-              className="w-87.5"
-              size="sm"
-              selectedKeys={new Set([appConfig?.systemCorePath || ''])}
-              disallowEmptySelection={systemCorePaths.length > 0}
-              isDisabled={loadingPaths}
-              onSelectionChange={(v) => {
-                const selectedPath = v.currentKey as string
-                if (selectedPath) handleConfigChangeWithRestart('systemCorePath', selectedPath)
-              }}
-            >
-              {loadingPaths ? (
-                <SelectItem key="">正在查找系统内核...</SelectItem>
-              ) : systemCorePaths.length > 0 ? (
-                systemCorePaths.map((path) => <SelectItem key={path}>{path}</SelectItem>)
-              ) : (
-                <SelectItem key="">未找到系统内核</SelectItem>
-              )}
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select
+                aria-label="系统内核路径"
+                classNames={{ trigger: 'data-[hover=true]:bg-default-200' }}
+                className="w-72"
+                size="sm"
+                selectedKeys={new Set([appConfig?.systemCorePath || ''])}
+                disallowEmptySelection={systemCorePaths.length > 0}
+                isDisabled={loadingPaths}
+                onSelectionChange={(v) => {
+                  const selectedPath = v.currentKey as string
+                  if (selectedPath) handleConfigChangeWithRestart('systemCorePath', selectedPath)
+                }}
+              >
+                {loadingPaths ? (
+                  <SelectItem key="">正在查找系统内核...</SelectItem>
+                ) : systemCorePaths.length > 0 ? (
+                  systemCorePaths.map((path) => <SelectItem key={path}>{path}</SelectItem>)
+                ) : (
+                  <SelectItem key="">未找到系统内核</SelectItem>
+                )}
+              </Select>
+              <Button size="sm" variant="flat" onPress={handlePickSystemCore}>
+                选择文件
+              </Button>
+            </div>
             {!loadingPaths && systemCorePaths.length === 0 && (
               <div className="mt-2 text-sm text-warning">
-                未在系统中找到 mihomo 或 clash 内核，请安装后重试
+                未在系统中找到 mihomo 或 clash 内核。可以点右侧「选择文件」手动指定一个可执行文件。
               </div>
             )}
           </SettingItem>
