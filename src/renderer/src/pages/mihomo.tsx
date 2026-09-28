@@ -26,6 +26,7 @@ import {
 import React, { useState, useEffect } from 'react'
 import ControllerSetting from '@renderer/components/mihomo/controller-setting'
 import ExtraConfigSetting from '@renderer/components/mihomo/extra-config-setting'
+import AccountSetting from '@renderer/components/mihomo/account-setting'
 import EnvSetting from '@renderer/components/mihomo/env-setting'
 import AdvancedSetting from '@renderer/components/mihomo/advanced-settings'
 import LogSetting from '@renderer/components/mihomo/log-setting'
@@ -339,6 +340,7 @@ const Mihomo: React.FC = () => {
           />
         </SettingItem>
       </SettingCard>
+      <AccountSetting />
       <ExtraConfigSetting />
       <PortSetting />
       <ControllerSetting />

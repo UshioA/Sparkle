@@ -18,6 +18,7 @@ import { parseYaml, stringifyYaml } from '../utils/yaml'
 import { copyFile, mkdir, readdir, writeFile } from 'fs/promises'
 import { deepMerge } from '../utils/merge'
 import { applyExtraConfig } from '../config/extraConfig'
+import { applyAccountProvider } from './accountProfile'
 import vm from 'vm'
 import { existsSync, writeFileSync } from 'fs'
 import path from 'path'
@@ -35,12 +36,7 @@ export async function generateProfile(): Promise<void> {
     getControledMihomoConfig()
   ])
   const { current } = profileConfig
-  const {
-    diffWorkDir = false,
-    controlDns = true,
-    controlSniff = true,
-    core = 'mihomo'
-  } = appConfig
+  const { diffWorkDir = false, controlDns = true, controlSniff = true, core = 'mihomo' } = appConfig
   const nextRawProfileStr = await getProfileStr(current)
   let currentProfileConfig = parseYaml<MihomoConfig>(nextRawProfileStr)
   if (typeof currentProfileConfig !== 'object') currentProfileConfig = {} as MihomoConfig
@@ -59,6 +55,8 @@ export async function generateProfile(): Promise<void> {
   }
 
   const profile = deepMerge(JSON.parse(JSON.stringify(currentProfile)), configToMerge)
+
+  applyAccountProvider(profile, appConfig)
 
   if (controlDns && profile.dns) {
     profile.dns['proxy-server-nameserver-policy'] =

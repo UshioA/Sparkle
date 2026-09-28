@@ -1,5 +1,4 @@
 import { Button } from '@heroui/react'
-import { REPO_URL } from '../../../../shared/repo'
 import { JSX, ReactNode } from 'react'
 import { ErrorBoundary, FallbackProps } from 'react-error-boundary'
 

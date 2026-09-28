@@ -58,6 +58,17 @@ const extraConfigTemplate = `# Sparkle 附加配置（用户自备）
 # group-inject:
 #   - group: 节点选择            # 目标组名；写 MATCH 表示 MATCH 规则指向的那个组
 #     prepend: [mygroup]         # 插到成员列表最前面（append 则是追加到末尾）
+#
+# 如果这个构建带「账号节点」功能：
+#   账号在客户端的「账号节点」卡片里维护，provider 和分组由客户端自动注入，这里只需要门控。
+#   要给它补 provider 参数，就按同名 provider 写对象（会 deep-merge）：
+# proxy-providers:
+#   account:
+#     private-key-file: /path/to/privkey.pem
+#   要手动指定分组挂载点：
+# group-inject:
+#   - group: 节点选择
+#     prepend: [account, account-自动]
 `
 
 export function ensureExtraConfigFile(): string {

@@ -244,6 +244,10 @@ export async function restartCore(): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('restartCore'))
 }
 
+export async function clearAccountProviderCache(): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('clearAccountProviderCache'))
+}
+
 export async function stopCore(): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('stopCore'))
 }

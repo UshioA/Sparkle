@@ -32,6 +32,14 @@ interface IHost {
   value: string | string[]
 }
 
+interface AccountItem {
+  id: string
+  name: string
+  email: string
+  password: string
+  interval?: number
+}
+
 interface AppConfig {
   updateChannel: AppUpdateChannel
   notificationMode?: AppNotificationMode
@@ -39,6 +47,9 @@ interface AppConfig {
   core: 'mihomo' | 'mihomo-alpha' | 'system'
   systemCorePath?: string
   corePermissionMode?: 'elevated' | 'service'
+  /** 账号节点列表；同一时刻只有 activeAccountId 对应的账号生效 */
+  accounts?: AccountItem[]
+  activeAccountId?: string
   serviceRunMode?: 'auto' | 'sandbox' | 'direct'
   serviceAuthKey?: string
   disableLoopbackDetector: boolean
