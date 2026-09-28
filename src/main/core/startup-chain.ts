@@ -1,4 +1,5 @@
 import path from 'path'
+import os from 'os'
 import type { CoreStartupHook } from './startupHook'
 import { mihomoIpcPath, mihomoProfileWorkDir, mihomoWorkDir } from '../utils/dirs'
 
@@ -28,6 +29,44 @@ export interface ProviderInitializationTracker {
   isReady: (logLine: string) => boolean
 }
 
+// 内核是独立进程，需要知道用户目录（例如按 "~" 解析路径）和临时目录。
+// Node 的 `env` 选项是整体替换而不是继承 process.env，所以这里显式透传与路径
+// 相关的用户环境变量；缺失时用 os.homedir() 兜底，避免 service/SYSTEM 等精简
+// 环境下 "~" 无法展开。
+const coreEnvPassthroughKeys = [
+  'PATH',
+  'HOME',
+  'USERPROFILE',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'TEMP',
+  'TMP',
+  'TMPDIR'
+] as const
+
+function createCoreUserEnvironment(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {}
+  for (const key of coreEnvPassthroughKeys) {
+    const value = process.env[key]
+    if (value) env[key] = value
+  }
+
+  let home: string
+  try {
+    home = os.homedir()
+  } catch {
+    home = ''
+  }
+  if (home) {
+    env.HOME ??= home
+    env.USERPROFILE ??= home
+  }
+
+  return env
+}
+
 export function createCoreEnvironment(
   options: CoreEnvironmentOptions
 ): Record<string, string | undefined> {
@@ -37,7 +76,7 @@ export function createCoreEnvironment(
     DISABLE_SYSTEM_CA: String(options.disableSystemCA),
     DISABLE_NFTABLES: String(options.disableNftables),
     SAFE_PATHS: options.safePaths.join(path.delimiter),
-    PATH: process.env.PATH
+    ...createCoreUserEnvironment()
   }
 }
 
